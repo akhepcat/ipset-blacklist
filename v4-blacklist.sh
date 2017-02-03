@@ -86,14 +86,16 @@ IP4_BLACKLIST_T=$(mktemp /tmp/ip4_bl-XXXXXX.tmp)
 
 for list in ${BLACKLISTS[@]}
 do
-    curl "${list}" | zgrep -Po '(?:\d{1,3}\.){3}\d{1,3}(?:/\d{1,2})?'
+	echo "# ${list}"
+	curl "${list}" | zgrep -Po '(?:\d{1,3}\.){3}\d{1,3}(?:/\d{1,2})?'
 done >> ${IP4_BLACKLIST_T}
 
 for list in ${WIZLISTS}; do
+	echo "# ${list}"
         curl "http://www.wizcrafts.net/${list}-iptables-blocklist.html" | grep -v \< | grep -v \: | grep -v \; | grep -v \# | grep [0-9]
 done >> ${IP4_BLACKLIST_T}
 
-sort -n ${IP4_BLACKLIST_T} ${IP4_BLACKLIST_CUSTOM} | uniq > ${IP4_BLACKLIST_GEN}
+egrep -v "^(#|$)" ${IP4_BLACKLIST_T} ${IP4_BLACKLIST_CUSTOM} 2>/dev/null | sort -n | uniq > ${IP4_BLACKLIST_GEN}
 
 LINES=$(wc -l ${IP4_BLACKLIST_GEN} | awk '{print $1}')
 if [ ${LINES} -gt 65535 ]; then
@@ -101,7 +103,7 @@ if [ ${LINES} -gt 65535 ]; then
 fi
 
 ipset flush ${BL_SET}
-egrep -v "^#|^$" ${IP4_BLACKLIST_GEN} | while IFS= read -r IP
+egrep -o '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(/[0-9]{1,2})?' ${IP4_BLACKLIST_GEN} | while IFS= read -r IP
 do
         ipset add ${BL_SET} ${IP}
 done
