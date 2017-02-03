@@ -69,7 +69,8 @@ prerequisites() {
 	  ipset create ${BL_SET} hash:net
 	fi
 
-	if [ -z "$(iptables -L -n | grep -iE \"match-set.*${BL_SET}\" )" ]; then
+	_iptok=$(iptables -L -n | grep -iE "match-set.*${BL_SET}" )
+	if [ -z "${_iptok}" ]; then
 	  echo "ipset rule not found in current iptables for blacklist: ${BL_SET}"
 	  echo "insert the following rule where appropriate before running this script"
 	  echo "    -A INPUT -m set --match-set ${BL_SET} src -j DROP"
@@ -79,7 +80,7 @@ prerequisites() {
 
 #############################
 
-prerequisites()
+prerequisites
 
 IP4_BLACKLIST_T=$(mktemp /tmp/ip4_bl-XXXXXX.tmp)
 
@@ -105,4 +106,4 @@ do
         ipset add ${BL_SET} ${IP}
 done
 
-cleanup()
+cleanup
