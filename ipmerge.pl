@@ -18,7 +18,7 @@ my @addresses;
 my @addresses_raw = (<STDIN>);
 
 # Rough filter for non-IP records.
-my @addresses_raw2 = grep /^[0-9]/, @addresses_raw;
+my @addresses_raw2 = grep /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/, @addresses_raw;
 
 # Create network objects for each record.
 push @addresses, NetAddr::IP->new($_) for @addresses_raw2;
