@@ -95,7 +95,7 @@ for list in ${WIZLISTS}; do
         curl "http://www.wizcrafts.net/${list}-iptables-blocklist.html" | grep -v \< | grep -v \: | grep -v \; | grep -v \# | grep [0-9]
 done >> ${IP4_BLACKLIST_T}
 
-egrep -v "^(#|$)" ${IP4_BLACKLIST_T} ${IP4_BLACKLIST_CUSTOM} 2>/dev/null | sort -n | uniq > ${IP4_BLACKLIST_GEN}
+egrep -v "^(#|$)" ${IP4_BLACKLIST_T} ${IP4_BLACKLIST_CUSTOM} 2>/dev/null | sort -n | uniq | ./ipmerge.pl > ${IP4_BLACKLIST_GEN}
 
 LINES=$(wc -l ${IP4_BLACKLIST_GEN} | awk '{print $1}')
 if [ ${LINES} -gt 65535 ]; then
