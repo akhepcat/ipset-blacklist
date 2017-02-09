@@ -3,6 +3,7 @@
 #  additional lists from simestd
 #  refactoring by ak_hepcat
 PROG="${0##*/}"
+PDIR="$(dirname `readlink -f "$0"`)"
 DO_RETURN=${SHLVL}
 
 IP4_BLACKLIST_GEN=/etc/ip-blacklist.conf
@@ -35,22 +36,19 @@ BLACKLISTS=(
 
 ###
 
-trap cleanup SIGINT SIGTERM SIGKILL SIGQUIT SIGABRT SIGSTOP SIGSEGV
+trap do_exit SIGINT SIGTERM SIGKILL SIGQUIT SIGABRT SIGSTOP SIGSEGV
 
 do_exit()
 {
         STATUS=${1:-0}
         REASON=${2}
 
+	[[ -e "${IP4_BLACKLIST_T}" ]] && rm -f "${IP4_BLACKLIST_T}"
+
+
         [[ -n "${REASON}" ]] && echo "${REASON}"
 
         [[ ${DO_RETURN} -eq 1 ]] && return $STATUS || exit $STATUS
-}
-
-cleanup() {
-	rm -f ${IP4_BLACKLIST_T}
-	rm -f ${IPSET_T}
-	do_exit
 }
 
 prerequisites() {
@@ -69,18 +67,27 @@ prerequisites() {
 	  ipset create ${BL_SET} hash:net
 	fi
 
-	_iptok=$(iptables -L -n | grep -iE "match-set.*${BL_SET}" )
-	if [ -z "${_iptok}" ]; then
-	  echo "ipset rule not found in current iptables for blacklist: ${BL_SET}"
-	  echo "insert the following rule where appropriate before running this script"
-	  echo "    -A INPUT -m set --match-set ${BL_SET} src -j DROP"
-	  do_exit 1
+	if [ "${OPT}" != "sets" ]; then
+		_iptok=$(iptables -L -n | grep -iE "match-set.*${BL_SET}" )
+		if [ -z "${_iptok}" ]; then
+		  echo "ipset rule not found in current iptables for blacklist: ${BL_SET}"
+		  echo "insert the following rule where appropriate before running this script"
+		  echo "    -A INPUT -m set --match-set ${BL_SET} src -j DROP"
+		  do_exit 1
+		fi
 	fi
 }
 
 #############################
 
+OPT=${1}
+
 prerequisites
+
+if [ "${OPT}" = "sets" ]
+then
+	do_exit 0
+fi
 
 IP4_BLACKLIST_T=$(mktemp /tmp/ip4_bl-XXXXXX.tmp)
 
@@ -95,7 +102,7 @@ for list in ${WIZLISTS}; do
         curl "http://www.wizcrafts.net/${list}-iptables-blocklist.html" | grep -v \< | grep -v \: | grep -v \; | grep -v \# | grep [0-9]
 done >> ${IP4_BLACKLIST_T}
 
-egrep -v "^(#|$)" ${IP4_BLACKLIST_T} ${IP4_BLACKLIST_CUSTOM} 2>/dev/null | sort -n | uniq | ./ipmerge.pl > ${IP4_BLACKLIST_GEN}
+egrep -v "^(#|$)" ${IP4_BLACKLIST_T} ${IP4_BLACKLIST_CUSTOM} 2>/dev/null | sort -n | uniq | ${PDIR}/ipmerge.pl > ${IP4_BLACKLIST_GEN}
 
 LINES=$(wc -l ${IP4_BLACKLIST_GEN} | awk '{print $1}')
 if [ ${LINES} -gt 65535 ]; then
@@ -108,4 +115,4 @@ do
         ipset add ${BL_SET} ${IP}
 done
 
-cleanup
+do_exit
