@@ -21,7 +21,7 @@ my @addresses_raw;
 
 # Filter out non-IP records.
 while (<STDIN>) {
-    if (m/^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(\/\d{1,2})?)(.*)$/) {
+    if (m/^((?:\d{1,3}\.){3}\d{1,3}(?:\/\d{1,2})?)(.*)$/) {
         push @addresses_raw, $1;
     }
 }
