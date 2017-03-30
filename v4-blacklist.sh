@@ -5,6 +5,7 @@
 PROG="${0##*/}"
 PDIR="$(dirname `readlink -f "$0"`)"
 DO_RETURN=${SHLVL}
+#DEBUG=1
 
 IP4_BLACKLIST_GEN=/etc/ip-blacklist.conf
 IP4_BLACKLIST_CUSTOM=/etc/ip-blacklist-custom.conf # optional
@@ -43,7 +44,12 @@ do_exit()
         STATUS=${1:-0}
         REASON=${2}
 
-	[[ -e "${IP4_BLACKLIST_T}" ]] && rm -f "${IP4_BLACKLIST_T}"
+	if [ -z "${DEBUG}" ]
+	then
+		[[ -e "${IP4_BLACKLIST_T}" ]] && rm -f "${IP4_BLACKLIST_T}"
+	else
+		echo "leaving temp file ${IP4_BLACKLIST_T}"
+	fi
 
 
         [[ -n "${REASON}" ]] && echo "${REASON}"
@@ -84,29 +90,44 @@ OPT=${1}
 
 prerequisites
 
-if [ "${OPT}" = "sets" ]
+if [ "${OPT}" = "sets" -o "${OPT}" = "stop" ]
 then
 	do_exit 0
 fi
 
-IP4_BLACKLIST_T=$(mktemp /tmp/ip4_bl-XXXXXX.tmp)
+if [ -z "${DEBUG}" ];
+then
+	SILENT="--silent"
+fi
 
-for list in ${BLACKLISTS[@]}
-do
-	echo "# ${list}"
-	curl "${list}" | zgrep -Po '(?:\d{1,3}\.){3}\d{1,3}(?:/\d{1,2})?'
-done >> ${IP4_BLACKLIST_T}
+test -e ${IP4_BLACKLIST_GEN} && MLAST=$(stat --format="%Y" ${IP4_BLACKLIST_GEN})
+NOW=$(date "+%s")
+if [ $((MLAST + 79440)) -lt ${NOW} ]
+then
+    echo "blacklist cache is older than 24h. Rebuilding, please wait."
 
-for list in ${WIZLISTS}; do
-	echo "# ${list}"
-        curl "http://www.wizcrafts.net/${list}-iptables-blocklist.html" | grep -v \< | grep -v \: | grep -v \; | grep -v \# | grep [0-9]
-done >> ${IP4_BLACKLIST_T}
 
-egrep -v "^(#|$)" ${IP4_BLACKLIST_T} ${IP4_BLACKLIST_CUSTOM} 2>/dev/null | sort -n | uniq | ${PDIR}/ipmerge.pl > ${IP4_BLACKLIST_GEN}
+	IP4_BLACKLIST_T=$(mktemp /tmp/ip4_bl-XXXXXX.tmp)
 
-LINES=$(wc -l ${IP4_BLACKLIST_GEN} | awk '{print $1}')
-if [ ${LINES} -gt 65535 ]; then
-	do_exit 1 "Exceeded max IP entries for ipset"
+	for list in ${BLACKLISTS[@]}
+	do
+		echo "# ${list}"
+		curl ${SILENT} "${list}" | zgrep -Po '(?:\d{1,3}\.){3}\d{1,3}(?:/\d{1,2})?'
+	done >> ${IP4_BLACKLIST_T}
+	
+	for list in ${WIZLISTS}; do
+		echo "# ${list}"
+	        curl ${SILENT} "http://www.wizcrafts.net/${list}-iptables-blocklist.html" | grep -v \< | grep -v \: | grep -v \; | grep -v \# | grep [0-9]
+	done >> ${IP4_BLACKLIST_T}
+	
+	egrep -v "^(#|$)" ${IP4_BLACKLIST_T} ${IP4_BLACKLIST_CUSTOM} 2>/dev/null | egrep -o '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(/[0-9]{1,2})?' | sort -n | uniq | ${PDIR}/ipmerge.pl > ${IP4_BLACKLIST_GEN}
+	
+	LINES=$(wc -l ${IP4_BLACKLIST_GEN} | awk '{print $1}')
+	if [ ${LINES} -gt 65535 ]; then
+		do_exit 1 "Exceeded max IP entries for ipset"
+	fi
+else
+	echo "building blacklist from existing cache"
 fi
 
 ipset flush ${BL_SET}

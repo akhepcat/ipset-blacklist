@@ -10,7 +10,7 @@
 use strict;
 use warnings;
 
-use NetAddr::IP;
+use NetAddr::IP qw(Compact);
 
 #-----------------------------------------------------------------------
 
@@ -18,12 +18,13 @@ my @addresses;
 my @addresses_raw = (<STDIN>);
 
 # Rough filter for non-IP records.
-my @addresses_raw2 = grep /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/, @addresses_raw;
+my @addresses_raw2 = grep /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(\/\d{1,2})?/, @addresses_raw;
 
 # Create network objects for each record.
+chomp(@addresses_raw2);
 push @addresses, NetAddr::IP->new($_) for @addresses_raw2;
 
 # Print output.
-print join("\n", NetAddr::IP::compact(@addresses)), "\n";
+print join("\n", Compact(@addresses)), "\n";
 
 #-----------------------------------------------------------------------
